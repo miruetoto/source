@@ -56,11 +56,6 @@ mms<-function(vector,range=c(0,1)){
 	vectorshift/max(vectorshift)*range[2]
 }
 
-#
-wht<-function(x){
-  print(list(mode=mode(x),class=class(x),len=len(x),dim=dim(x)))
-}
-
 # ggplots
 plt<-function(...){
   ggplot(...)+theme_bw()+theme(
@@ -89,3 +84,10 @@ sbt<-function(x,rule){
     }
     y
 }
+
+# infomation
+ifo<-function(x){
+  print(list(mode=mode(x),class=class(x),len=len(x),dim=dim(x)))
+}
+
+
