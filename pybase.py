@@ -1,22 +1,104 @@
-############################## import useful python packages ##############################
+#1. import useful python packages 
 import numpy as np
 import pandas as pd
-import os
-import warnings
+import matplotlib.pyplot as plt 
+from matplotlib.pyplot import plot 
+from matplotlib.pyplot import imshow
 
-############################## python system ##############################
+#import os
+#2. python system 
+import warnings
 warnings.filterwarnings(action='ignore')
 
-# def checkgpu(mode=1):
-#     if mode==1:
-#         import tensorflow as tf 
-#         print('GPU check 4 TensorFlow: '+ str(tf.test.gpu_device_name()))
-#     elif mode==2:
-#         import torch
-#         try: torch.cuda.get_device_name(0)
-#         except AssertionError as e: print('GPU check 4 Pytorch: ')
-#         else: print('GPU check 4 Pytorch: '+ str(torch.cuda.get_device_name(0)))
-#     else: print("Type correct mode. Note that 'mode=1' means tensorflow(default) and 'mode=2' means pytorch") 
+
+#3. rpy2 
+import rpy2
+import rpy2.robjects as ro
+#ro.r('library(devtools)') ## to use source_url 
+#ro.r('library(tidyverse)')
+
+############################## rpy2 functions ##############################
+def p2r(A):
+    from rpy2.robjects.vectors import FloatVector 
+    from rpy2.robjects.vectors import StrVector as s2r_temp
+
+    def a2r_temp(a):
+        if type(a) in {float,int,bool}: a=[a]
+        a=list(a)
+        rtn=FloatVector(a)
+        return rtn
+
+    def m2r_temp(A):
+        Acopy=A.T.copy()
+        nrow=Acopy.shape[0]
+        Acopy.shape=(np.prod(Acopy.shape),1)
+        rtn=ro.r.matrix(a2r_temp(m2a(Acopy)),ncol=nrow)
+        del(Acopy)
+        ro.globalenv['A']=rtn
+        return rtn
+
+    from rpy2.robjects import pandas2ri
+    from rpy2.robjects.conversion import localconverter
+
+    def pd2r_temp(A):
+        with localconverter(ro.default_converter + pandas2ri.converter):
+            rtn = ro.conversion.py2rpy(A)
+        return rtn
+    
+    if type(A)==type(initpd('0',n=2,p=2)):
+        rtn=pd2r_temp(A) 
+    elif type(A)==type(init('0',(2,2))):
+        rtn=m2r_temp(A)
+    elif type(A)==str: #  elif type(pd.DataFrame(np.matrix(A)).iloc[0,0])==str: 와 순서바꾸면 안됨
+        rtn=s2r_temp(A)        
+    elif type(pd.DataFrame(np.matrix(A)).iloc[0,0])==str:
+        rtn=s2r_temp(pd.DataFrame(np.matrix(A)).T.iloc[:,0])
+    else:
+        rtn=a2r_temp(A)
+    return rtn 
+
+def push(py,rname=None):
+    import inspect
+    def retrieve_name(var):
+        for fi in reversed(inspect.stack()):
+            names = [var_name for var_name, var_val in fi.frame.f_locals.items() if var_val is var]
+            if len(names) > 0:
+                return names[0]
+    if rname==None: rname = retrieve_name(py)
+    ro.globalenv[rname]=p2r(py)
+
+def r2p(A):
+    from rpy2.robjects import pandas2ri
+    from rpy2.robjects.conversion import localconverter
+
+    def r2a_temp(a):
+        return list(a)
+    
+    def r2m_temp(A):
+        return np.matrix(A)
+    
+    def r2pd_temp(A):
+        with localconverter(ro.default_converter + pandas2ri.converter):
+            rtn = ro.conversion.rpy2py(A)
+        return rtn        
+    
+    ro.globalenv['temp']=A
+    if ro.r('is.null(dim(temp))')[0]==False: ## in the cases of matrix or dataframe
+        if ro.r('is.data.frame(temp)')[0]: 
+            rtn=r2pd_temp(A)
+        elif ro.r('is.matrix(temp)')[0]:
+            rtn=r2m_temp(A)
+        else:
+            print('I don\`t know which type of this data in R.')
+    else:
+        rtn=r2a_temp(A)
+    ro.r('rm("temp")')
+    return rtn
+
+def pull(r):
+    return r2p(ro.globalenv[r])
+
+
 
 ############################## python functions ##############################
 def cc(start=0,end=1,samplingFreq=1):
@@ -71,7 +153,7 @@ def rbind(*Mat):
         rtn=rbindtemp(Mat[0],Mat[1])
         for i in co(2,lenofMat):
             rtn=rbindtemp(rtn,Mat[i])
-    return rtn 
+    return rtn
 
 def cbindtemp(A,B):
     typ=['matrix','matrix']
@@ -157,7 +239,7 @@ def rbindtemp(A,B):
     
     return np.vstack([A,B])
 
-def info(A):
+def ifo(A):
     print("type of data  : ",type(A))
     try: len(A)
     except TypeError as e: print("len of data   : ",e)
@@ -166,7 +248,6 @@ def info(A):
     try: A.shape
     except AttributeError as e : print("shape of data : ",e)
     else: print("shape of data : ",A.shape)
-
 
 ### 배열의 차원을 출력해주는 함수 
 def dim(A):
@@ -253,136 +334,6 @@ def s2m(a): # a2c와 똑같은 함수임.
         rtn=a
     return rtn    
 
-### 초기화 (1) 0 (2) 유니폼 (3) 단위행렬 (4) 정규분포
-def init(typ,dim):
-    if dim*0==0: # dim 이 1차원일 경우 
-        if typ=="0": rtn=np.zeros(dim)
-        elif typ=="u": rtn=np.random.random(dim)
-        elif typ=="I": 
-            print("In the case of vectors, you cannot define a identity matrix.")
-            rtn=np.ones(dim)             
-        elif typ=="n": rtn=np.random.normal(0,1,dim)
-        
-    else: # dim 이 2차원일 경우 
-        if typ=="0": rtn=np.asmatrix(np.zeros(dim))
-        elif typ=="u": rtn=np.asmatrix(np.random.random(dim))
-        elif typ=="I": 
-            if dim[0]==dim[1]: rtn=np.eye(dim[0])
-            elif dim[0]>dim[1]: rtn=rbind(np.eye(dim[1]),np.zeros((dim[0]-dim[1],dim[1])))
-            elif dim[0]<dim[1]: rtn=cbind(np.eye(dim[0]),np.zeros((dim[0],dim[1]-dim[0])))
-        elif typ=="n": rtn=np.asmatrix(np.random.normal(0,1,dim))
-    return rtn
-
-### elementwise 연산 
-# 입력: 스칼라, 컬럼벡터, 로우벡터, 매트릭스
-# 출력: 스칼라, 컬럼벡터, 로우벡터, 매트릭스 
-# 연산종류: scala2scala
-# ** 주의사항 **
-# - 데이터프레임형태의 입력은 받지 않도록 한다. 데이터프레임형태의 입려은 판다스에 내장된 .transform 메소드를 사용하는것이 더 나음. 
-# - 왜냐하면 데이터프레임->매트릭스로의 변환이 자유롭지 않기 때문에 이로 인한 오류가 발생할 수 있음. 
-
-def transform(X,fun,show=False):
-    Xmat=np.asmatrix(X)
-    # identifying dim of input X
-    if Xmat.shape[0]==1 and Xmat.shape[1]==1: Xtype='scala'
-    if Xmat.shape[0]==1 and Xmat.shape[1]>1: Xtype='rowvec'
-    if Xmat.shape[0]>1 and Xmat.shape[1]==1: Xtype='colvec'
-    if Xmat.shape[0]>1 and Xmat.shape[1]>1: Xtype='matrix'
-    
-    Xpd=pd.DataFrame(Xmat)
-    if Xtype=='scala':
-        print('Scala is not appropriate as an input of this function. Thus no operation is performed, therefore the output value is the same as the input value. ')
-        rtn=X
-        if show==True: disp=pd.concat([Xpd,Xpd],keys=['input','result'])
-    if Xtype=='rowvec':
-        rtn=eval('Xpd.iloc[0,:].transform('+fun+')')
-        if show==True: disp=pd.concat([Xpd,pd.DataFrame(rtn).T],keys=['input','result'],axis=0)
-        rtn=np.asmatrix(rtn)
-    if Xtype=='colvec':
-        rtn=eval('Xpd.iloc[:,0].transform('+fun+')')
-        if show==True: disp=pd.concat([Xpd,rtn],keys=['input','result'],axis=1)
-        rtn=np.asmatrix(rtn).T
-    if Xtype=='matrix':
-        rtn=eval('Xpd.iloc[:,:].transform('+fun+')')
-        if show==True: disp=pd.concat([Xpd,rtn],keys=['input','result'],axis=0)
-        rtn=np.asmatrix(rtn)
-    if show==True:
-        from IPython.display import display 
-        display(disp)
-    return rtn 
-
-    
-### 행별 or 열별 연산 
-# 입력: 매트릭스
-# 출력: 컬럼벡터, 로우벡터, 매트릭스 
-# 연산종류: array2array, array2scala. 
-# axis종류: column wise, row wise 
-# ** 주의사항 
-# - 데이터프레임형태의 입력은 받지 않도록 한다. 이 경우는 판다스에 내장된 .apply 메소드를 사용하는것이 더 나음. 
-# - 특히 데이터프레임->매트릭스로의 변환이 자유롭지 않아 여기에서 에러가 발생할 수 있다. 
-# - 입력의 형태는 매트릭스로 고정한다. 벡터나 스칼라 입력은 받지않는다. 이 경우 apply 를 쓸 이유 자체가 없음. 
-def apply(X,fun,arrow="down",show=False):     # axis=down: column-wise / axis=right: row-wise. 
-    Xmat=np.asmatrix(X)
-    # identifying dim of input X
-    if Xmat.shape[0]==1 and Xmat.shape[1]==1: Xtype='scala'
-    if Xmat.shape[0]==1 and Xmat.shape[1]>1: Xtype='rowvec'
-    if Xmat.shape[0]>1 and Xmat.shape[1]==1: Xtype='colvec'
-    if Xmat.shape[0]>1 and Xmat.shape[1]>1: Xtype='matrix'
-    
-    # identifying range of fun. 
-    # domain of fun is always vector. 
-    test=[1,2]
-    resultoftest=np.asmatrix(eval(fun+'(test)'))
-    if resultoftest.shape[0]==1 and resultoftest.shape[1]==1: funtype='array2scala'
-    if resultoftest.shape[0]==1 and resultoftest.shape[1]>1: funtype='array2array'
-    #if resultoftest.shape[0]>1 and resultoftest.shape[1]==1: funtype='array2array'
-    if resultoftest.shape[0]>1 and resultoftest.shape[1]>1: funtype='array2matrix'
-    
-    # arrow=0: column-wise
-    if arrow=="down" and Xtype=='matrix' and funtype=='array2scala':
-        disp=pd.DataFrame(Xmat)
-        rtn=eval('disp.apply('+fun+')')
-        disp=disp.T
-        disp['result']=rtn
-        rtn=np.asmatrix(rtn)
-        disp=disp.T
-    elif arrow=="down" and Xtype=='matrix' and funtype=='array2array':
-        rtn=eval('np.asmatrix(pd.DataFrame(Xmat).apply('+fun+'))')
-        disp=pd.concat([pd.DataFrame(Xmat),pd.DataFrame(rtn)],keys=['input','result'])
-    elif arrow=="down" and Xtype=='matrix' and funtype=='array2matrix':
-        print('The "array2matrix" type operator is not supported. Since no operation is performed, the output value is the same as the input value.')
-        rtn=Xmat
-        disp=pd.concat([pd.DataFrame(Xmat),pd.DataFrame(rtn)],keys=['input','result'])
-        
-    # arrow="right": row-wise
-    elif arrow=="right" and Xtype=='matrix' and funtype=='array2scala':
-        disp=pd.DataFrame(Xmat)
-        disp['result']=eval('disp.apply('+fun+',axis=1)')
-        rtn=np.asmatrix(disp['result']).T
-    elif arrow=="right" and Xtype=='matrix' and funtype=='array2array':
-        rtn=eval('np.asmatrix(pd.DataFrame(Xmat).T.apply('+fun+')).T')
-        disp=pd.concat([pd.DataFrame(Xmat),pd.DataFrame(rtn)],keys=['input','result'])
-    elif arrow=="right" and Xtype=='matrix' and funtype=='array2matrix':
-        print('The "array2matrix" type operator is not supported. Since no operation is performed, the output value is the same as the input value.')
-        rtn=Xmat
-        disp=pd.concat([pd.DataFrame(Xmat),pd.DataFrame(rtn)],keys=['input','result'])
-    elif Xtype=='scala' or Xtype=='rowvec' or Xtype=='colvec':
-        print('Input of this function should be a matrix. Thus no operation is performed, therefore the output value is the same as the input value.')
-        rtn=Xmat
-        if Xtype=='colvec': 
-            disp=pd.concat([pd.DataFrame(Xmat),pd.DataFrame(rtn)],keys=['input','result'],axis=1)
-        else:
-            disp=pd.concat([pd.DataFrame(Xmat),pd.DataFrame(rtn)],keys=['input','result'],axis=0)
-        if Xtype=='scala': rtn=Xmat[0,0]
-    
-    if show==True:
-        if type(disp) is str : print(disp)
-        else:
-            from IPython.display import display 
-            display(disp)
-    
-    return rtn
-
 def sprod(*index): 
     nofMindex=len(index)
     indexListtype=list(range(0,nofMindex))
@@ -402,126 +353,6 @@ def sprod(*index):
         
     return rtn
 
-def initmpd(*index,p=1,iname=None,vname=None): # mpd is short for multi-indexed pandas dataframe. 
-    nofMindex=len(index)
-    indexListtype=list(range(0,nofMindex))
-    for i in range(0,nofMindex):
-        if type(index[i]) is str: indexListtype[i]=[index[i]]
-        elif np.asmatrix(index[i]).shape==(1,1): indexListtype[i]=[str(np.asmatrix(index[i])[0,0])]
-        else: indexListtype[i]=index[i]
-
-    mindex=pd.MultiIndex.from_product(indexListtype)
-    if iname==None: iname=sprod('index',cc(1,len(indexListtype)))
-    if vname==None: vname=sprod('X',cc(1,p))
-    n=mindex.shape[0]
-    val=init('0',(n,p))
-    rtn=pd.DataFrame(val,index=mindex).reset_index()
-    rtn.columns=iname+vname
-    return rtn
-# example: initmpd(['a','b','c'],['(i)','(ii)'],p=4)
-
-def initpd(typ,n,p=1,vname=None): 
-    if vname==None: vname=sprod('X',cc(1,p))
-    val=init(typ,(n,p))
-    rtn=pd.DataFrame(val)
-    rtn.columns=vname
-    return rtn   
-
 def ids(pddata):
     push(pddata.columns,"vname")
     print(r2p(ro.r("str_c(str_c('(',str_c(1:length(vname)-1),') ',vname),collapse='\n')"))[0])
-
-############################## Interaction between R and python ##############################
-
-import rpy2
-import rpy2.robjects as ro
-############################## load useful r packages ##############################
-ro.r('library(devtools)') ## to use source_url 
-ro.r('library(tidyverse)')
-
-############################## rpy2 functions ##############################
-def p2r(A):
-    from rpy2.robjects.vectors import FloatVector 
-    from rpy2.robjects.vectors import StrVector as s2r_temp
-
-    def a2r_temp(a):
-        if type(a) in {float,int,bool}: a=[a]
-        a=list(a)
-        rtn=FloatVector(a)
-        return rtn
-
-    def m2r_temp(A):
-        Acopy=A.T.copy()
-        nrow=Acopy.shape[0]
-        Acopy.shape=(np.prod(Acopy.shape),1)
-        rtn=ro.r.matrix(a2r_temp(m2a(Acopy)),ncol=nrow)
-        del(Acopy)
-        ro.globalenv['A']=rtn
-        return rtn
-
-    from rpy2.robjects import pandas2ri
-    from rpy2.robjects.conversion import localconverter
-
-    def pd2r_temp(A):
-        with localconverter(ro.default_converter + pandas2ri.converter):
-            rtn = ro.conversion.py2rpy(A)
-        return rtn
-    
-    if type(A)==type(initpd('0',n=2,p=2)):
-        rtn=pd2r_temp(A) 
-    elif type(A)==type(init('0',(2,2))):
-        rtn=m2r_temp(A)
-    elif type(A)==str: #  elif type(pd.DataFrame(np.matrix(A)).iloc[0,0])==str: 와 순서바꾸면 안됨
-        rtn=s2r_temp(A)        
-    elif type(pd.DataFrame(np.matrix(A)).iloc[0,0])==str:
-        rtn=s2r_temp(pd.DataFrame(np.matrix(A)).T.iloc[:,0])
-    else:
-        rtn=a2r_temp(A)
-    return rtn 
-
-def push(py,rname=None):
-    import inspect
-    def retrieve_name(var):
-        for fi in reversed(inspect.stack()):
-            names = [var_name for var_name, var_val in fi.frame.f_locals.items() if var_val is var]
-            if len(names) > 0:
-                return names[0]
-    if rname==None: rname = retrieve_name(py)
-    ro.globalenv[rname]=p2r(py)
-
-def r2p(A):
-    from rpy2.robjects import pandas2ri
-    from rpy2.robjects.conversion import localconverter
-
-    def r2a_temp(a):
-        return list(a)
-    
-    def r2m_temp(A):
-        return np.matrix(A)
-    
-    def r2pd_temp(A):
-        with localconverter(ro.default_converter + pandas2ri.converter):
-            rtn = ro.conversion.rpy2py(A)
-        return rtn        
-    
-    ro.globalenv['temp']=A
-    if ro.r('is.null(dim(temp))')[0]==False: ## in the cases of matrix or dataframe
-        if ro.r('is.data.frame(temp)')[0]: 
-            rtn=r2pd_temp(A)
-        elif ro.r('is.matrix(temp)')[0]:
-            rtn=r2m_temp(A)
-        else:
-            print('I don\`t know which type of this data in R.')
-    else:
-        rtn=r2a_temp(A)
-    ro.r('rm("temp")')
-    return rtn
-
-def pull(r):
-    return r2p(ro.globalenv[r])
-
-### plots 
-#import matplotlib as mpl 
-import matplotlib.pyplot as plt 
-from matplotlib.pyplot import plot 
-from matplotlib.pyplot import imshow
