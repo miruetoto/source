@@ -13,6 +13,14 @@
 
 ### funstions such that length of funtions names = 3
 
+library(tidyverse)
+library(lubridate)
+library(stringr)
+library(forcats)
+library(ggplot2)
+library(gridExtra)
+library(latex2exp)
+
 
 # clv is clean variable name 
 clv<-function(dfdata){

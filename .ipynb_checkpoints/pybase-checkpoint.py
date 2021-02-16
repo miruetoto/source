@@ -42,6 +42,7 @@ def p2r(A):
         return rtn
 
     def m2r_temp(A):
+        A=np.matrix(A)
         Acopy=A.T.copy()
         nrow=Acopy.shape[0]
         Acopy.shape=(np.prod(Acopy.shape),1)
@@ -58,8 +59,13 @@ def p2r(A):
     
     if type(A)==type(pd.DataFrame(np.zeros([2,2]))):
         rtn=pd2r_temp(A) 
-    elif type(A)==type(np.zeros([2,2])):
+    elif type(A)==type(np.matrix(np.zeros([2,2]))):
         rtn=m2r_temp(A)
+    elif type(A)==type(np.zeros([2,2])):
+        if dim(A)==1: 
+            rtn=a2r_temp(A)
+        else:
+            rtn=m2r_temp(A)
     elif type(A)==str: #  elif type(pd.DataFrame(np.matrix(A)).iloc[0,0])==str: 와 순서바꾸면 안됨
         rtn=s2r_temp(A)        
     elif type(pd.DataFrame(np.matrix(A)).iloc[0,0])==str:
