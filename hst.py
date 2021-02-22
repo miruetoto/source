@@ -63,21 +63,21 @@ def hst(f,W,V,τ,b,γ=0.5,T=999999999): #samefunction with hst1realization excep
 #     rtn=np.asmatrix(hstresult[sprod('h',np.arange(0,τ+1))])
 #     return rtn
 
-def hmat(hst_):
-    τ=int((hst_.shape[1]-2))
-    rtn=np.asmatrix(hst_[sprod('h',np.arange(0,τ+1))])
+def hmat(hst__):
+    τ=int((hst__.shape[1]-2))
+    rtn=np.asmatrix(hst__[sprod('h',np.arange(0,τ+1))])
     rtn=rtn-np.matrix(np.apply_along_axis(np.mean,1,rtn)).T
     return rtn
 
-def sigmamat(hmat_): #supporting snowdist, #hh:=n*p 
-    hmat_=np.array(hmat_)
-    n=len(hmat_)
+def sigmamat(hmat__): #supporting snowdist, #hh:=n*p 
+    hmat__=np.array(hmat__)
+    n=len(hmat__)
     rtn=np.array(np.zeros([n,n]))
     try: 
-        rtn=np.sum((hmat_[:,np.newaxis,:]-hmat_[np.newaxis,:,:])**2,axis=-1)
+        rtn=np.sum((hmat__[:,np.newaxis,:]-hmat__[np.newaxis,:,:])**2,axis=-1)
     except MemoryError:
         for i in np.arange(0,n):
-            rtn[i,:]=np.sum((hmat_[i,:]-hmat_[:,:])**2,axis=1)
+            rtn[i,:]=np.sum((hmat__[i,:]-hmat__[:,:])**2,axis=1)
     return np.asmatrix(rtn)
 
 # def sigmamat_v2(hmat_,τmax=None): 
@@ -85,13 +85,13 @@ def sigmamat(hmat_): #supporting snowdist, #hh:=n*p
 #     else: rtn=l2dist(hmat_[:,0:(τmax+1)])
 #     return rtn
 
-def weightmat(sigmamat_,θ=1): 
-    n=len(sigmamat_)
+def weightmat(sigmamat__,θ=1): 
+    n=len(sigmamat__)
     rtn=np.zeros([n,n])
     for i in np.arange(0,n):
         for j in np.arange(0,n):
             if i==j: rtn[i,j]=0
-            else: rtn[i,j]=np.exp(-sigmamat_[i,j]**2/(2*θ**2))
+            else: rtn[i,j]=np.exp(-sigmamat__[i,j]**2/(2*θ**2))
     return rtn
 
 # def total_degree(W):
